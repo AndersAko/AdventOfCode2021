@@ -1,6 +1,5 @@
 use std::fs;
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
 use itertools::Itertools;
 
 #[derive(Debug)]
@@ -10,7 +9,7 @@ struct Display {
 }
 
 fn main() {
-    let filecontents = fs::read_to_string("input_test.txt").expect("Something went wrong?");
+    let filecontents = fs::read_to_string("input.txt").expect("Something went wrong?");
 
     let lines = filecontents.split_terminator("\n");
     // .map(|x| x.parse::<i32>().unwrap()).collect::<Vec<i32>>();
@@ -39,16 +38,27 @@ fn main() {
     }
     println!("Part 1: A total of {} digits are 1, 7, 4 or 8", &count);
 
-    solve(&"acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab".split_whitespace()
-        .map(|x| String::from(x)).collect::<Vec<String>>());
-    // for disp in displays {
-    //     let foo = solve(&disp.combinations);
-    //     println!("Solution to {:?} is {:?}", &disp, foo);
-    //     println!();
-    // }
-
+    let mut sum = 0;
+    for disp in displays {
+        let solution = solve(&disp.combinations);
+        println!("Solution to {:?} is {:?}", &disp, solution);
+        let mut number_result = Vec::<char>::new();
+        for out in disp.output {
+            for digit in digits() {
+                if digit.segments.iter().all(|&s| out.contains(solution.segments[s].unwrap()) ) 
+                    && digit.segments.len() == out.len() {
+                    number_result.push(std::char::from_digit(digit.number as u32,10).unwrap());
+                    print!("{}", digit.number);
+                }
+            }
+        }
+        println!();
+        let number_result = String::from_iter(number_result.iter()).parse::<u32>().unwrap();
+        println!("{:?} ", number_result);
+        sum += number_result;
+    }
+    println!("Part2: answer = {} ", sum);
 }
-
     // in 3 , but not 2 => seg1
     // count6 => seg2
     // count8 => seg3
@@ -84,7 +94,6 @@ impl PartialOrd for State {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
-
 }
 
 #[derive(Clone, Debug)]
@@ -93,9 +102,8 @@ struct NumberDisplay {
     segments : Vec<usize>
 }
 
-// Gives sorted vec, where [0] is combination for "0", etc
-fn solve(combinations: &Vec<String>) -> Vec<char> {
-    let digits:Vec<NumberDisplay> = vec!{ 
+fn digits() -> Vec<NumberDisplay> {
+    return vec!{ 
         NumberDisplay { number : 0, segments: vec!(0,1,2,4,5,6)},
         NumberDisplay { number : 1, segments: vec!(2,5) },
         NumberDisplay { number : 2, segments: vec!(0,2,3,4,6) },
@@ -107,65 +115,97 @@ fn solve(combinations: &Vec<String>) -> Vec<char> {
         NumberDisplay { number : 8, segments: vec!(0,1,2,3,4,5,6) },
         NumberDisplay { number : 9, segments: vec!(0,1,2,3,5,6) }
     };
+}
+
+fn solve_for_state (state: State, combinations:  &Vec<String>) -> Option<State> {
+    println!("Evaluating state {:?}", state);
+
+    if state.index == combinations.len() {
+        assert!(state.segments.iter().all(|s| s.is_some())); 
+        println!("=Found a solution: {:?}", state);
+        return Some(state);
+    }
+    let combination = &combinations[state.index];
+    let mut possible_digits:Vec<NumberDisplay> = digits().clone();
+    possible_digits.retain(|d| d.segments.len() == combination.len() && !state.used_digits[d.number] );
+
+    if possible_digits.len() == 0 { return None ; }
+
+    let unmatched_letters:Vec<char> = combination.chars()
+        .filter(|&c| !state.segments.iter().any(|&s| s == Some(c)))
+        .collect();
+        
+    // println!("-- For the combination {:?}, the possible digits are: {:?} and remaining letters after filtering out {:?} is {:?}",
+    //         &combination, &possible_digits, state.segments, unmatched_letters);
+
+    for mut digit in possible_digits {
+        if digit.segments.iter().any(|&s| {
+                if let Some(letter) = state.segments[s] {
+                    !combination.chars().contains(&letter)
+                } else { 
+                    false 
+                }
+             })  {
+                // // println!("Mismatched segments: {:?}", digit.segments.iter().filter(|&s| {
+                //     if let Some(letter) = state.segments[*s] {
+                //         !combination.chars().contains(&letter)
+                //     } else { 
+                //         false 
+                //     }
+                //  }));
+                continue;
+            }
+        
+        digit.segments.retain(|&s| {
+            if let Some(letter) = state.segments[s as usize] {
+                !combination.chars().contains(&letter) 
+            } else { true }
+        });
+        // println!("---- Combination {}, trying digit {} matching digit segments {:?} to {:?}",
+                // combination, digit.number, digit.segments, unmatched_letters);
+
+        match unmatched_letters.len() {
+            0 if digit.segments.len() == 0 => {
+                    // println!("all segments matched already");
+                    let mut next_state = State { index: state.index+1, ..state };
+                    next_state.used_digits[digit.number] = true;
+                    if let Some(solution) = solve_for_state(next_state, combinations) {
+                        return Some(solution);
+                    }
+                },
+            letters if letters == digit.segments.len() => {
+                    // println!("generating new");
+                    for permutation in unmatched_letters.iter().permutations(unmatched_letters.len()) {
+                        let mut next_state = State { index: state.index+1, ..state};
+                        next_state.used_digits[digit.number] = true;
+                        for i in 0..permutation.len() {
+                            next_state.segments[digit.segments[i] as usize] = Some(*permutation[i]);
+                        }
+                        if let Some(solution) = solve_for_state(next_state, combinations) {
+                            return Some(solution);
+                        }
+                    }
+                },
+            _ => {
+                // println!("Trying to match digit {:?} with {:?} combination failed since {:?}",
+                // digit, unmatched_letters, state.segments);                    
+                }
+        }
+    }
+    return None;
+} 
+// Gives sorted vec, where [0] is combination for the digit "0", etc
+fn solve(combinations: &Vec<String>) -> State {
     
     let mut sorted_by_len = combinations.clone();
     sorted_by_len.sort_by(|x, y| x.len().cmp(&y.len()) );
     
-    let mut heap = BinaryHeap::new();
+    let state = State {index: 0, segments: [None;7], used_digits: [false; 10] };
+    let solution = solve_for_state (state, &sorted_by_len).unwrap();
 
-    heap.push( State {index: 0, segments: [None;7], used_digits: [false; 10] } );
-    while let Some( State{index, segments, used_digits} ) = heap.pop() {
-        if index == 10 {
-            assert!(segments.iter().all(|s| s.is_some())); 
-            println!("==> Found one solution: {:?} {:?}", segments, used_digits);
-            // return Vec::from(segments.map(|c| c.unwrap() ));
-            continue;
-        }
+    println!("===> Found a solution: {:?}", solution);
 
-        let comb:Vec<char> = sorted_by_len[index].chars().collect();
-        let mut possible_digits:Vec<NumberDisplay> = digits.clone();
-        possible_digits.retain(|d| d.segments.len() == comb.len() && !used_digits[d.number] );
-
-        let remaining_letters:Vec<char> = comb.iter()
-            .filter(|&&c| !segments.iter().any(|&s| s == Some(c)))
-            .map(|c| *c )
-            .collect();
-
-        println!("-- For the combination {:?}, the possible digits are: {:?} and remaining letters after filtering out {:?} is {:?}",
-            &comb, &possible_digits, segments, remaining_letters);
-
-        for mut digit in possible_digits {
-            print!("Digit {:?}", digit);
-            digit.segments.retain(|&s| segments[s as usize].is_none());
-            println!(" filtered to {:?}", digit);
-
-            match remaining_letters.len() {
-                0 if digit.segments.len() == 0 => {
-                    let mut next_state = State { index: index+1, segments: segments, used_digits};
-                    next_state.used_digits[digit.number] = true;
-                    println!("Possible next state {:?}", next_state);
-                    heap.push(next_state); 
-                    },
-                letters if letters == digit.segments.len() => {
-                        for permutation in remaining_letters.iter().permutations(remaining_letters.len()) {
-                            let mut next_state = State { index: index+1, segments: segments, used_digits};
-                            next_state.used_digits[digit.number] = true;
-                            for i in 0..permutation.len() {
-                                next_state.segments[digit.segments[i] as usize] = Some(*permutation[i]);
-                            }
-                            println!("Possible next state {:?}", next_state);
-                            heap.push(next_state);
-                        }
-                    }
-                _ => {
-                    println!("Trying to match digit {:?} with {:?} combination failed since {:?}",
-                    digit, remaining_letters, segments);                    
-                }
-            }
-        }
-    }
-    
-    vec!('0')
+    return solution;
 }
 
 // combinations: bdcfga fag dgafc fg dacbf bdafec cfbg fabdgec eabdfg eagcd 
