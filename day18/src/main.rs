@@ -17,6 +17,13 @@ struct SnailFishNumber {
     root: Option<PairIndex>
 }
 
+#[derive(Debug)]
+enum Dir {
+    FromRight,
+    FromLeft,
+    FromUp
+}
+
 impl SnailFishNumber {
     fn new() -> Self {
         SnailFishNumber { arena: Vec::new(), root: None }
@@ -57,12 +64,6 @@ impl SnailFishNumber {
    
 
     fn find_left(&mut self, index: PairIndex) -> Option<&mut Pair> {
-        enum Dir {
-            FromRight,
-            FromLeft,
-            FromUp
-        }
-
         // println!("Searching for left element of {}", self.fmt_pair(index));
 
         let parent = self.get(index).parent;
@@ -103,12 +104,6 @@ impl SnailFishNumber {
     }
 
     fn find_right(&mut self, index: PairIndex) -> Option<&mut Pair> {
-        enum Dir {
-            FromRight,
-            FromLeft,
-            FromUp
-        }
-
         // println!("Searching for right element of {}", self.fmt_pair(index));
 
         let parent = self.get(index).parent;
@@ -117,19 +112,21 @@ impl SnailFishNumber {
         let mut coming_from = if self.get(parent).rhs.unwrap() == index { Dir::FromRight } else { Dir::FromLeft };
         let mut node_index = parent;
         loop {
-            // println!("Trying {}", self.fmt_pair(node_index));
+            // println!("Trying {}({}) {:?}", self.fmt_pair(node_index), node_index, coming_from);
             let node = self.get(node_index);
             if node.regular.is_some() && node_index != index {
                 return Some(self.get_mut(node_index));
             }
             match coming_from {
-                Dir::FromRight => 
+                Dir::FromRight => {
+                    // println!("FromRight: parent = {:?} node_index = {}", node.parent, node_index);
                     if let Some(next) = node.parent {
                         coming_from = if self.get(next).rhs.unwrap() == node_index { Dir::FromRight } else { Dir::FromLeft };
                         node_index = next;
                     } else {
                         return None;
-                    },
+                    }
+                },
                 Dir::FromLeft => 
                     if let Some(next) = node.rhs {
                         coming_from = Dir::FromUp;
@@ -148,9 +145,9 @@ impl SnailFishNumber {
         }
     }
 
-    fn explode (&mut self, index:PairIndex, nesting_level: usize) -> bool {
+    fn explode(&mut self, index:PairIndex, nesting_level: usize) -> bool {
         if nesting_level == 4 && self.get(index).lhs.is_some() && self.get(index).rhs.is_some() { 
-            println!("Exploding {} {}", nesting_level, self.fmt_pair(index));
+            // println!("Exploding {} {}", nesting_level, self.fmt_pair(index));
             if let Some(lhs) = self.get(index).lhs {
                 let lhs_regular = self.get(lhs).regular.unwrap();
                 if let Some(left) = self.find_left(index) {
@@ -190,9 +187,10 @@ impl SnailFishNumber {
         
     }
 
-    fn split (&mut self, index: PairIndex) -> bool {
+    fn split(&mut self, index: PairIndex) -> bool {
         if let Some(reg) = self.get(index).regular {
             if reg >=10 {
+                // println!("Splitting {}", self.fmt_pair(index));
                 let new_left = self.add(Pair { 
                     regular: Some(reg / 2), lhs: None, rhs: None, parent: Some(index)
                 });
@@ -220,15 +218,28 @@ impl SnailFishNumber {
         return false
     }
 
-    fn reduce (&mut self) {
+    fn reduce(&mut self) {
         if let Some(tree_index) = self.root {
             loop {
+                // println!("-- {}", self);
                 if self.explode(tree_index, 0) { continue }
                 if self.split(tree_index) { continue }
                 break;
             }
         }
     }
+
+    fn magnitude(&self, index: PairIndex) -> usize {
+        let node = self.get(index);
+        if let Some(regular) = node.regular {
+            regular as usize
+        } else if node.lhs.is_some() && node.rhs.is_some() {
+            self.magnitude(node.lhs.unwrap()) * 3 + self.magnitude(node.rhs.unwrap()) * 2
+        } else {
+            panic!();
+        }
+    }
+
 }
 impl fmt::Display for SnailFishNumber {
 
@@ -274,26 +285,59 @@ fn read_snailfish(snail: &mut SnailFishNumber, input: &str, index: &mut usize, p
 } 
 
 fn main() {
-    let filecontents = fs::read_to_string("input_test_explode.txt").expect("Something went wrong?");
+    let filecontents = fs::read_to_string("input.txt").expect("Something went wrong?");
     let lines: Vec<&str> = filecontents.split_terminator("\n").collect();
 
-    let input = "[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]";
-    let mut index: usize = 0;
     let mut snail = SnailFishNumber::new();
-    snail.root = Some(read_snailfish(&mut snail, input, &mut index, None));
-    println!("Input: {} => {} ", input, snail);
-    // for i in 0..snail.arena.len() {
-    //     println!("Left of index {}({}) = {:?}", i, snail.fmt_pair(i),  snail.find_left(i));
-    // }
-    // for i in 0..snail.arena.len() {
-    //     println!("Right of index {}({}) = {:?}", i, snail.fmt_pair(i),  snail.find_right(i));
-    // }
 
-    for line in lines {
+    println!("Part 1");
+    for line in &lines {
         let mut index: usize = 0;
-        let mut snail = SnailFishNumber::new();
-        snail.root = Some(read_snailfish(&mut snail, line, &mut index, None));
+        let number = Some(read_snailfish(&mut snail, line, &mut index, None));
+        if snail.root.is_none() {
+            snail.root = number;
+        } else {
+            let old_root = snail.root;
+            let new_root = snail.add(Pair { 
+                regular: None, parent: None, lhs: snail.root, rhs: number
+            });
+            snail.root = Some(new_root);
+            snail.get_mut(old_root.unwrap()).parent = Some(new_root);
+            snail.get_mut(number.unwrap()).parent = Some(new_root);
+        }
+        println!("Input: {} gives snail = {} ", line, snail);
         snail.reduce();
-        println!("Input: {} reduces to => {} ", line, snail);
+        println!("which reduces to => {} with magnitude {} ", snail, snail.magnitude(snail.root.unwrap()));
     }
+    println!();
+
+    // Part 2
+    let mut highest = 0;
+    for first in 0..lines.len() {
+        for second in 0..lines.len() {
+            if first == second { continue }
+            let mut snail = SnailFishNumber::new();
+            let mut index: usize = 0;
+            let number1 = Some(read_snailfish(&mut snail, lines[first], &mut index, None));
+
+            index = 0;
+            let number2 = Some(read_snailfish(&mut snail, lines[second], &mut index, None));
+            
+            let root = snail.add(Pair { 
+                regular: None, parent: None, lhs: number1, rhs: number2
+            });
+            snail.root = Some(root);
+            snail.get_mut(number1.unwrap()).parent = Some(root);
+            snail.get_mut(number2.unwrap()).parent = Some(root);
+            
+            snail.reduce();
+            let magnitude = snail.magnitude(snail.root.unwrap());
+            println!("{} + {} => {} with magnitude {} ", 
+                snail.fmt_pair(number1.unwrap()), snail.fmt_pair(number2.unwrap()), 
+                snail, magnitude
+            );
+            if magnitude > highest { highest = magnitude }
+        }
+    }
+    println! ("Part2: Highest magnitude of two numbers = {}", highest);
 }
