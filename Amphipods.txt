@@ -1,0 +1,32 @@
+
+paths: 
+	[
+		from, [(to,stop), (to,stop), ... ]
+		...
+	]
+	// 16 från rum + 28 till rum
+
+for path in paths.filter(from = amph.pos) {
+	for loc in path.path {
+		if occupied break;
+		if stop && !wrong_room { push pos }
+	}
+
+-------------
+
+paths: 
+	[ 
+		from, to, stop
+		..
+	]
+
+for amph in 0..=8 
+	for path in paths.filter (from = amph.pos) {
+		pos = amph.pos
+		while {
+			pos = pos.to
+			if occupied || added break;
+			added.insert(pos)
+			if stop { push pos }
+		}
+		
