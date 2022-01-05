@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::fs;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::collections::BinaryHeap;
 use std::collections::VecDeque;
 use std::cmp::Ordering;
@@ -47,12 +47,13 @@ impl State {
         let mut min_remain = 0; 
         for amph in 0..8 {
             min_remain = min_remain + 10usize.pow( (amph/2) as u32) * 
-                if self.in_correct_room(amph) && self.squatter(self.positions[amph]) { 4 }
-                else if self.in_room(amph) { (2 + (self.correct_room(amph) - self.positions[amph]).abs()/5) as usize }
-                else { ((self.positions[amph]/2 + 1 - self.correct_room(amph)/10).abs()  + 1)  as usize } ;
+                if self.in_correct_room(amph) && !self.squatter(self.positions[amph]) { 0 }
+                else if !self.in_room(amph) { 3 * self.corridor_amphs() } 
+                else { 4 } ;
         }
         self.energy + min_remain
     }
+
     fn in_correct_room(&self, amph: usize) -> bool {
         return State::correct_room_with_position(amph, self.positions[amph as usize])
     }
@@ -70,7 +71,9 @@ impl State {
     fn room(position: &Position) -> bool {
         *position > 10
     }
-
+    fn corridor_amphs(&self) -> usize {
+        self.positions.iter().filter(|&p| State::room(&p)).count()
+    }
     fn occupied(&self, pos: Position) -> bool {
         self.positions.iter().any(|&x| x == pos)
     }
@@ -113,20 +116,34 @@ impl State {
                 for (from, to, stop) in possible_pos {
                     let next = *to;
                     // print!(" {} ", next);
-                    if self.occupied(next) || added.contains(&next) { continue; }
+                    if self.occupied(next) || added.contains(&next) { continue; } 
+                    // if State::room(&next) && 
+                    //         (!starting_in_room || !State::correct_room_with_position(amph, next) || self.squatter(next))) {
+                    //          continue;
+                    // }
                     added.push(next);
-                    // if stop && !incorrect_room(next) && ! ( corridor && started in corridor ) { push (next) }
-                    if *stop && 
-                        ( !State::room(&next) ||
-                            (State::correct_room_with_position(amph, next) && !self.squatter(next))) && 
-                        ( State::room(&next) || starting_in_room ) {
-                            let mut positions = self.positions.clone();
-                            positions[amph as usize] = next;
-                            moves.push(State {
-                                positions, energy: self.energy + 10usize.pow( (amph/2) as u32) * no_moves
-                            });
-                            // println!("   possible move to {}", next);
+                    if *stop {
+                        if State::correct_room_with_position(amph, next) {
+                            // println!("Correct room {} with squatter {} and potential {} ", State::correct_room_with_position(amph, next), 
+                                // self.squatter(next), ( next % 10 == 1 || self.occupied(next + 1))); 
+                            if !self.squatter(next) && ( next % 10 == 1 || self.occupied(next + 1)) {
+                                let mut positions = self.positions.clone();
+                                positions[amph as usize] = next;
+                                // println!("   only move to {}", next);
+                                return vec![ State {
+                                    positions, energy: self.energy + 10usize.pow( (amph/2) as u32) * no_moves
+                                }];
+                            }
                         }
+                        if !State::room(&next) && starting_in_room {
+                                let mut positions = self.positions.clone();
+                                positions[amph as usize] = next;
+                                moves.push(State {
+                                    positions, energy: self.energy + 10usize.pow( (amph/2) as u32) * no_moves
+                                });
+                                // println!("   possible move to {}", next);
+                            }
+                    }
                     stack.push_back((next, no_moves + 1));
                 }
             }
@@ -186,22 +203,34 @@ fn main() {
 }
 
 fn solve (state: State) -> State {
-    let mut visited = HashSet::new();
+    let mut visited = HashMap::new();
     let mut queue = BinaryHeap::new();
+    let mut solutions = Vec::new();
+    let mut lowest_energy_found : Option<usize> = None;
 
     queue.push(state);
     while let Some(state) = queue.pop() {
-        if state.done() { return state; }
-        visited.insert(state.positions);
-        if visited.len() < 10 || visited.len() % 1000 == 0 { 
-            println!("{}", state);
+        if lowest_energy_found.is_some() && state.estimated_energy() > lowest_energy_found.unwrap() * 6 / 5 {
+            break;
         }
+        if state.done() { 
+            println!("Found a solution {} {}", visited.len(), state);
+            lowest_energy_found = Some(state.energy);
+            solutions.push(state);
+            // return state;
+         }
+        // if visited.len() % 5000 == 0  { 
+        //     println!("{}", state);
+        // }
         // Possible moves
         for next_state in state.moves() {
-            if !visited.contains(&next_state.positions) {
+            let lowest_cost_here = visited.get(&next_state.positions);
+            if lowest_cost_here.is_none() || *lowest_cost_here.unwrap() > next_state.energy {
+                visited.insert(next_state.positions, next_state.energy);
                 queue.push(next_state);
             }
         }
     }
-    panic!();
+    println!("Searched {} positions", visited.len());
+    return *solutions.iter().min_by(|&x,&y| x.energy.cmp(&y.energy)).unwrap();
 }
