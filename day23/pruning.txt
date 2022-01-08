@@ -1,0 +1,12 @@
+Moves 
+#############
+#...C.....D.#
+###B#.#B#.###
+  #D#C#B#A#
+  #D#B#A#C#
+  #A#D#C#A#
+  ######### 
+
+(Anta C sista som flyttade och står till vänster om sitt rum )
+  => Omöjlig om Room(C) innehåller någon som ska till vänster om C  (Motsvarande åt höger)
+
