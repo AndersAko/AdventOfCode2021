@@ -40,15 +40,15 @@ fn main() {
     println!("=== 10 steps ===");
     let result = solver.solve(template, 10);
     println!("{:?}", result.elements);
-    let max = *result.elements.iter().max_by(|(k0,v0), (k1,v1)| v0.cmp(&v1) ).unwrap().1;
-    let min = *result.elements.iter().min_by(|(k0,v0), (k1,v1)| v0.cmp(&v1) ).unwrap().1;
+    let max = *result.elements.iter().max_by(|(_,v0), (_,v1)| v0.cmp(&v1) ).unwrap().1;
+    let min = *result.elements.iter().min_by(|(_,v0), (_,v1)| v0.cmp(&v1) ).unwrap().1;
     println!("Part 1 answer: {}  (Max: {} Min: {}) ", max - min , max, min);
 
     println!("=== 40 steps ===");
     let result = solver.solve(template, 40);
     println!("{:?}", result.elements);
-    let max = *result.elements.iter().max_by(|(k0,v0), (k1,v1)| v0.cmp(&v1) ).unwrap().1;
-    let min = *result.elements.iter().min_by(|(k0,v0), (k1,v1)| v0.cmp(&v1) ).unwrap().1;
+    let max = *result.elements.iter().max_by(|(_,v0), (_,v1)| v0.cmp(&v1) ).unwrap().1;
+    let min = *result.elements.iter().min_by(|(_,v0), (_,v1)| v0.cmp(&v1) ).unwrap().1;
     println!("Part 2 answer: {}  (Max: {} Min: {}) ", max - min , max, min);
 
 }

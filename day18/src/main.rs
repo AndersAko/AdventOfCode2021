@@ -1,6 +1,5 @@
 use std::fs;
 use std::fmt;
-use std::collections::HashSet;
 
 type PairIndex = usize;
 

@@ -56,7 +56,6 @@ fn main() {
         round += 1;
     }
     println!("Part 2: Player 1 wins in {} universes. Player 2 wins in {}", wins[0], wins[1]);
-
 }
 
 struct Die { 

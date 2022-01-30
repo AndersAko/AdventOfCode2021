@@ -99,7 +99,7 @@ fn flash_octopi(x: i32, y :i32, octopi: &mut Vec<Vec<u8>>, flashes: &mut u128) {
     }
 }
 
-fn print_octopi(octopi : &Vec<Vec<u8>>) {
+fn _print_octopi(octopi : &Vec<Vec<u8>>) {
     for row in octopi {
         for oct in row {
             print!("{}", oct);
